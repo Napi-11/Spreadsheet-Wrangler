@@ -27,7 +27,10 @@ function Get-FileNumber {
     return $null
 }
 
-# Function to log messages to the output textbox
+# Global variable for log file path
+$script:LogFilePath = $null
+
+# Function to log messages to the output textbox and optionally to a file
 function Write-Log {
     param (
         [Parameter(Mandatory=$true)]
@@ -37,7 +40,10 @@ function Write-Log {
         [string]$Color = "LightGreen"
     )
     
-    # Ensure we're on the UI thread
+    # Get timestamp for log file
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    
+    # Ensure we're on the UI thread for textbox updates
     if ($outputTextbox.InvokeRequired) {
         $outputTextbox.Invoke([Action[string, string]]{ param($msg, $clr) 
             $outputTextbox.SelectionColor = [System.Drawing.Color]::$clr
@@ -48,6 +54,11 @@ function Write-Log {
         $outputTextbox.SelectionColor = [System.Drawing.Color]::$Color
         $outputTextbox.AppendText("$Message`r`n")
         $outputTextbox.ScrollToCaret()
+    }
+    
+    # If logging to file is enabled, write to the log file
+    if ($script:LogFilePath -and (Test-Path $script:LogFilePath)) {
+        "[$timestamp] $Message" | Out-File -FilePath $script:LogFilePath -Append
     }
 }
 
@@ -889,6 +900,21 @@ $toolTip.SetToolTip($runBtn, "Start the backup and spreadsheet combining process
 $runBtn.Add_Click({
     # Clear previous output
     $outputTextbox.Clear()
+    
+    # Initialize log file if logging is enabled
+    if ($optionCheckboxes[5].Checked) { # Log to File option
+        $logFileName = "SpreadsheetWrangler_Log_$(Get-TimeStampString).txt"
+        $script:LogFilePath = Join-Path -Path $PWD.Path -ChildPath $logFileName
+        
+        # Create the log file with header
+        "Spreadsheet Wrangler Log - Started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $script:LogFilePath
+        "--------------------------------------------------------------" | Out-File -FilePath $script:LogFilePath -Append
+        
+        Write-Log "Logging to file: $script:LogFilePath" "Cyan"
+    } else {
+        $script:LogFilePath = $null
+    }
+    
     Write-Log "Starting operations..." "Cyan"
     
     # Start backup process if not skipped
@@ -902,6 +928,13 @@ $runBtn.Add_Click({
     Start-SpreadsheetCombiningProcess
     
     Write-Log "All operations completed." "Cyan"
+    
+    # Add final log entry if logging is enabled
+    if ($script:LogFilePath -and (Test-Path $script:LogFilePath)) {
+        Write-Log "Log file saved to: $script:LogFilePath" "Yellow"
+        "--------------------------------------------------------------" | Out-File -FilePath $script:LogFilePath -Append
+        "Spreadsheet Wrangler Log - Completed at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $script:LogFilePath -Append
+    }
 })
 $leftLayout.Controls.Add($runBtn, 0, 3)
 #endregion
@@ -983,12 +1016,12 @@ $checkbox5.Margin = New-Object System.Windows.Forms.Padding(5)
 $toolTip.SetToolTip($checkbox5, "Change all values in 'Add to Quantity' column to '1' (runs after duplication)")
 $optionsLayout.Controls.Add($checkbox5, 1, 1)
 
-# Option 6: Placeholder
+# Option 6: Log to File
 $optionCheckboxes += $checkbox6 = New-Object System.Windows.Forms.CheckBox
-$checkbox6.Text = "Option 6"
+$checkbox6.Text = "Log to File"
 $checkbox6.Dock = "Fill"
 $checkbox6.Margin = New-Object System.Windows.Forms.Padding(5)
-$toolTip.SetToolTip($checkbox6, "Reserved for future functionality")
+$toolTip.SetToolTip($checkbox6, "Save terminal output to a log file in the application directory")
 $optionsLayout.Controls.Add($checkbox6, 2, 1)
 
 # Option 7: Placeholder
