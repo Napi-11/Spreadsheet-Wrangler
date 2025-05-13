@@ -670,6 +670,13 @@ $containerPanel.Controls.Add($mainLayout)
 # Initialize current config file variable
 $script:CurrentConfigFile = $null
 
+# Create tooltip component for the entire form
+$toolTip = New-Object System.Windows.Forms.ToolTip
+$toolTip.AutoPopDelay = 5000
+$toolTip.InitialDelay = 500
+$toolTip.ReshowDelay = 200
+$toolTip.ShowAlways = $true
+
 #region Left Panel
 $leftPanel = New-Object System.Windows.Forms.Panel
 $leftPanel.Dock = "Fill"
