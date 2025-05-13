@@ -2,7 +2,7 @@
 
 A PowerShell GUI application for folder backups and spreadsheet combining operations.
 
-![Spreadsheet Wrangler](https://github.com/BryantWelch/Spreadsheet-Wrangler/raw/main/screenshots/main-interface.png)
+<img src="https://github.com/user-attachments/assets/c78e7d1f-e388-4f1a-841d-0bfc4900e2b8" width=75% height=75%>
 
 ## Features
 
