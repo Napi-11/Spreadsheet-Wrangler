@@ -76,10 +76,6 @@ powershell -ExecutionPolicy Bypass -File .\SpreadsheetWrangler.ps1
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Author
-
-Created by Bryant Welch
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -89,3 +85,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## Author
+
+Created by Bryant Welch
+
+If you find this project helpful, consider supporting its development:
+
+[![Buy Me a Coffee](https://storage.ko-fi.com/cdn/kofi5.png)](https://ko-fi.com/V7V01A0SJC)
