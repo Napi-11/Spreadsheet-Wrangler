@@ -37,13 +37,19 @@ A PowerShell GUI application for folder backups and spreadsheet combining operat
 
 ## Installation
 
-1. Clone this repository or download the latest release
-2. Extract the files to your preferred location
-3. Run `SpreadsheetWrangler.ps1` with PowerShell:
+1. Click the green code button at the top of this repo and select download zip
+2. Alternatively, you can clone this repository or download the latest release
+3. Extract the files to your preferred location
+
+## Running the Application
+
+### Option 1: Right-click method
+Right-click on `SpreadsheetWrangler.ps1` and select "Run with PowerShell"
+
+### Option 2: Command line (recommended for first run)
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\SpreadsheetWrangler.ps1
 ```
-
 ## Usage
 
 ### Backup Process
