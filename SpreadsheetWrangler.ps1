@@ -466,6 +466,8 @@ function Select-FolderDialog {
 # Load required assemblies
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Xml
+Add-Type -AssemblyName System.Xml.Linq
 
 # Create the main form
 $form = New-Object System.Windows.Forms.Form
@@ -478,6 +480,173 @@ $form.MaximizeBox = $false
 $form.MinimizeBox = $true
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 
+# Create the menu bar
+$menuBar = New-Object System.Windows.Forms.MenuStrip
+$menuBar.BackColor = [System.Drawing.SystemColors]::Control
+$form.MainMenuStrip = $menuBar
+
+# File Menu
+$fileMenu = New-Object System.Windows.Forms.ToolStripMenuItem
+$fileMenu.Text = "File"
+
+# New Configuration
+$newConfigMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$newConfigMenuItem.Text = "New Configuration"
+$newConfigMenuItem.ShortcutKeys = [System.Windows.Forms.Keys]::Control -bor [System.Windows.Forms.Keys]::N
+$newConfigMenuItem.Add_Click({
+    # Reset all settings
+    $backupLocations.Items.Clear()
+    $spreadsheetLocations.Items.Clear()
+    $destinationLocation.Text = ""
+    
+    # Reset all checkboxes
+    foreach ($checkbox in $optionCheckboxes) {
+        $checkbox.Checked = $false
+    }
+    
+    Write-Log "Configuration reset to default." "Cyan"
+})
+$fileMenu.DropDownItems.Add($newConfigMenuItem)
+
+# Open Configuration
+$openConfigMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$openConfigMenuItem.Text = "Open Configuration..."
+$openConfigMenuItem.ShortcutKeys = [System.Windows.Forms.Keys]::Control -bor [System.Windows.Forms.Keys]::O
+$openConfigMenuItem.Add_Click({
+    $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+    $openFileDialog.Filter = "XML Files (*.xml)|*.xml|All Files (*.*)|*.*"
+    $openFileDialog.Title = "Open Configuration"
+    $openFileDialog.InitialDirectory = $PSScriptRoot
+    
+    if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        Load-Configuration -ConfigPath $openFileDialog.FileName
+    }
+})
+$fileMenu.DropDownItems.Add($openConfigMenuItem)
+
+# Save Configuration
+$saveConfigMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$saveConfigMenuItem.Text = "Save Configuration"
+$saveConfigMenuItem.ShortcutKeys = [System.Windows.Forms.Keys]::Control -bor [System.Windows.Forms.Keys]::S
+$saveConfigMenuItem.Add_Click({
+    # If we have a current config file, save to it, otherwise prompt for location
+    if ($script:CurrentConfigFile -and (Test-Path $script:CurrentConfigFile)) {
+        Save-Configuration -ConfigPath $script:CurrentConfigFile
+    } else {
+        $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+        $saveFileDialog.Filter = "XML Files (*.xml)|*.xml|All Files (*.*)|*.*"
+        $saveFileDialog.Title = "Save Configuration"
+        $saveFileDialog.InitialDirectory = $PSScriptRoot
+        $saveFileDialog.DefaultExt = "xml"
+        
+        if ($saveFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            Save-Configuration -ConfigPath $saveFileDialog.FileName
+            $script:CurrentConfigFile = $saveFileDialog.FileName
+        }
+    }
+})
+$fileMenu.DropDownItems.Add($saveConfigMenuItem)
+
+# Save Configuration As
+$saveAsConfigMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$saveAsConfigMenuItem.Text = "Save Configuration As..."
+$saveAsConfigMenuItem.Add_Click({
+    $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+    $saveFileDialog.Filter = "XML Files (*.xml)|*.xml|All Files (*.*)|*.*"
+    $saveFileDialog.Title = "Save Configuration As"
+    $saveFileDialog.InitialDirectory = $PSScriptRoot
+    $saveFileDialog.DefaultExt = "xml"
+    
+    if ($saveFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        Save-Configuration -ConfigPath $saveFileDialog.FileName
+        $script:CurrentConfigFile = $saveFileDialog.FileName
+    }
+})
+$fileMenu.DropDownItems.Add($saveAsConfigMenuItem)
+
+# Separator
+$fileMenu.DropDownItems.Add("-")
+
+# Exit
+$exitMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$exitMenuItem.Text = "Exit"
+$exitMenuItem.ShortcutKeys = [System.Windows.Forms.Keys]::Alt -bor [System.Windows.Forms.Keys]::F4
+$exitMenuItem.Add_Click({ $form.Close() })
+$fileMenu.DropDownItems.Add($exitMenuItem)
+
+# Help Menu
+$helpMenu = New-Object System.Windows.Forms.ToolStripMenuItem
+$helpMenu.Text = "Help"
+
+# About
+$aboutMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$aboutMenuItem.Text = "About"
+$aboutMenuItem.Add_Click({
+    $aboutForm = New-Object System.Windows.Forms.Form
+    $aboutForm.Text = "About Spreadsheet Wrangler"
+    $aboutForm.Size = New-Object System.Drawing.Size(450, 300)
+    $aboutForm.StartPosition = "CenterParent"
+    $aboutForm.FormBorderStyle = "FixedDialog"
+    $aboutForm.MaximizeBox = $false
+    $aboutForm.MinimizeBox = $false
+    
+    $aboutPanel = New-Object System.Windows.Forms.TableLayoutPanel
+    $aboutPanel.Dock = "Fill"
+    $aboutPanel.RowCount = 3
+    $aboutPanel.ColumnCount = 1
+    $aboutPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 60)))
+    $aboutPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 20)))
+    $aboutPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 20)))
+    $aboutForm.Controls.Add($aboutPanel)
+    
+    # Main about text
+    $aboutLabel = New-Object System.Windows.Forms.Label
+    $aboutLabel.Text = "Spreadsheet Wrangler v1.0`n`nA powerful tool for backing up folders and combining spreadsheets.`n`nCreated by Bryant Welch`nCreated: $(Get-Date -Format 'yyyy-MM-dd')`n`n(c) 2025 Bryant Welch. All Rights Reserved"
+    $aboutLabel.AutoSize = $false
+    $aboutLabel.Dock = "Fill"
+    $aboutLabel.TextAlign = "MiddleCenter"
+    $aboutPanel.Controls.Add($aboutLabel, 0, 0)
+    
+    # GitHub link
+    $linkLabel = New-Object System.Windows.Forms.LinkLabel
+    $linkLabel.Text = "https://github.com/BryantWelch/Spreadsheet-Wrangler"
+    $linkLabel.AutoSize = $false
+    $linkLabel.Dock = "Fill"
+    $linkLabel.TextAlign = "MiddleCenter"
+    $linkLabel.LinkColor = [System.Drawing.Color]::Blue
+    $linkLabel.ActiveLinkColor = [System.Drawing.Color]::Red
+    $linkLabel.Add_LinkClicked({
+        param($sender, $e)
+        Start-Process "https://github.com/BryantWelch/Spreadsheet-Wrangler"
+    })
+    $aboutPanel.Controls.Add($linkLabel, 0, 1)
+    
+    # OK button
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = "OK"
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $okButton.Dock = "Fill"
+    $okButton.Margin = New-Object System.Windows.Forms.Padding(150, 10, 150, 10)
+    $aboutPanel.Controls.Add($okButton, 0, 2)
+    $aboutForm.AcceptButton = $okButton
+    
+    $aboutForm.ShowDialog() | Out-Null
+})
+$helpMenu.DropDownItems.Add($aboutMenuItem)
+
+# Add menus to menu bar
+$menuBar.Items.Add($fileMenu)
+$menuBar.Items.Add($helpMenu)
+
+# Add menu bar to form
+$form.Controls.Add($menuBar)
+
+# Create a container panel to hold everything below the menu bar
+$containerPanel = New-Object System.Windows.Forms.Panel
+$containerPanel.Dock = "Fill"
+$containerPanel.Padding = New-Object System.Windows.Forms.Padding(0, $menuBar.Height, 0, 0)
+$form.Controls.Add($containerPanel)
+
 # Create a table layout panel for the main layout
 $mainLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $mainLayout.Dock = "Fill"
@@ -485,7 +654,10 @@ $mainLayout.RowCount = 1
 $mainLayout.ColumnCount = 2
 $mainLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 30)))
 $mainLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 70)))
-$form.Controls.Add($mainLayout)
+$containerPanel.Controls.Add($mainLayout)
+
+# Initialize current config file variable
+$script:CurrentConfigFile = $null
 
 #region Left Panel
 $leftPanel = New-Object System.Windows.Forms.Panel
@@ -524,7 +696,8 @@ $backupLocations.View = "Details"
 $backupLocations.FullRowSelect = $true
 $backupLocations.Columns.Add("Folder Path", -2)
 $backupLocations.Dock = "Fill"
-$backupLocations.ToolTip = "List of folders to back up. Select an item and press Delete or use the minus button to remove it."
+# Set tooltip for backup locations using the tooltip component
+$toolTip.SetToolTip($backupLocations, "List of folders to back up. Select an item and press Delete or use the minus button to remove it.")
 $backupLocations.Add_KeyDown({
     param($sender, $e)
     # Delete selected item when Delete key is pressed
@@ -604,7 +777,8 @@ $spreadsheetLocations.View = "Details"
 $spreadsheetLocations.FullRowSelect = $true
 $spreadsheetLocations.Columns.Add("Folder Path", -2)
 $spreadsheetLocations.Dock = "Fill"
-$spreadsheetLocations.ToolTip = "List of folders containing spreadsheets to combine. Select an item and press Delete or use the minus button to remove it."
+# Set tooltip for spreadsheet locations using the tooltip component
+$toolTip.SetToolTip($spreadsheetLocations, "List of folders containing spreadsheets to combine. Select an item and press Delete or use the minus button to remove it.")
 $spreadsheetLocations.Add_KeyDown({
     param($sender, $e)
     # Delete selected item when Delete key is pressed
@@ -865,6 +1039,147 @@ $progressBar.Value = 0
 $toolTip.SetToolTip($progressBar, "Shows overall progress of the current operation")
 $rightLayout.Controls.Add($progressBar, 0, 2)
 #endregion
+
+# Function to save configuration to XML file
+function Save-Configuration {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$ConfigPath
+    )
+    
+    try {
+        # Create XML document
+        $xmlDoc = New-Object System.Xml.XmlDocument
+        $xmlDeclaration = $xmlDoc.CreateXmlDeclaration("1.0", "UTF-8", $null)
+        $xmlDoc.AppendChild($xmlDeclaration) | Out-Null
+        
+        # Create root element
+        $rootElement = $xmlDoc.CreateElement("SpreadsheetWranglerConfig")
+        $xmlDoc.AppendChild($rootElement) | Out-Null
+        
+        # Add backup locations
+        $backupLocationsElement = $xmlDoc.CreateElement("BackupLocations")
+        $rootElement.AppendChild($backupLocationsElement) | Out-Null
+        
+        foreach ($item in $backupLocations.Items) {
+            $locationElement = $xmlDoc.CreateElement("Location")
+            $locationElement.InnerText = $item.Text
+            $backupLocationsElement.AppendChild($locationElement) | Out-Null
+        }
+        
+        # Add spreadsheet locations
+        $spreadsheetLocationsElement = $xmlDoc.CreateElement("SpreadsheetLocations")
+        $rootElement.AppendChild($spreadsheetLocationsElement) | Out-Null
+        
+        foreach ($item in $spreadsheetLocations.Items) {
+            $locationElement = $xmlDoc.CreateElement("Location")
+            $locationElement.InnerText = $item.Text
+            $spreadsheetLocationsElement.AppendChild($locationElement) | Out-Null
+        }
+        
+        # Add destination location
+        $destinationElement = $xmlDoc.CreateElement("DestinationLocation")
+        $destinationElement.InnerText = $destinationLocation.Text
+        $rootElement.AppendChild($destinationElement) | Out-Null
+        
+        # Add options
+        $optionsElement = $xmlDoc.CreateElement("Options")
+        $rootElement.AppendChild($optionsElement) | Out-Null
+        
+        for ($i = 0; $i -lt $optionCheckboxes.Count; $i++) {
+            $optionElement = $xmlDoc.CreateElement("Option")
+            $optionElement.SetAttribute("Index", $i)
+            $optionElement.SetAttribute("Checked", $optionCheckboxes[$i].Checked)
+            $optionsElement.AppendChild($optionElement) | Out-Null
+        }
+        
+        # Save the XML document
+        $xmlDoc.Save($ConfigPath)
+        
+        Write-Log "Configuration saved to: $ConfigPath" "Green"
+        return $true
+    }
+    catch {
+        Write-Log "Error saving configuration: $_" "Red"
+        return $false
+    }
+}
+
+# Function to load configuration from XML file
+function Load-Configuration {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$ConfigPath
+    )
+    
+    try {
+        # Check if file exists
+        if (-not (Test-Path -Path $ConfigPath)) {
+            Write-Log "Configuration file not found: $ConfigPath" "Red"
+            return $false
+        }
+        
+        # Load XML document
+        $xmlDoc = New-Object System.Xml.XmlDocument
+        $xmlDoc.Load($ConfigPath)
+        
+        # Clear current settings
+        $backupLocations.Items.Clear()
+        $spreadsheetLocations.Items.Clear()
+        $destinationLocation.Text = ""
+        
+        foreach ($checkbox in $optionCheckboxes) {
+            $checkbox.Checked = $false
+        }
+        
+        # Load backup locations
+        $backupLocationsElement = $xmlDoc.SelectSingleNode("//BackupLocations")
+        if ($backupLocationsElement) {
+            foreach ($locationElement in $backupLocationsElement.SelectNodes("Location")) {
+                $item = New-Object System.Windows.Forms.ListViewItem($locationElement.InnerText)
+                $backupLocations.Items.Add($item)
+            }
+        }
+        
+        # Load spreadsheet locations
+        $spreadsheetLocationsElement = $xmlDoc.SelectSingleNode("//SpreadsheetLocations")
+        if ($spreadsheetLocationsElement) {
+            foreach ($locationElement in $spreadsheetLocationsElement.SelectNodes("Location")) {
+                $item = New-Object System.Windows.Forms.ListViewItem($locationElement.InnerText)
+                $spreadsheetLocations.Items.Add($item)
+            }
+        }
+        
+        # Load destination location
+        $destinationElement = $xmlDoc.SelectSingleNode("//DestinationLocation")
+        if ($destinationElement) {
+            $destinationLocation.Text = $destinationElement.InnerText
+        }
+        
+        # Load options
+        $optionsElement = $xmlDoc.SelectSingleNode("//Options")
+        if ($optionsElement) {
+            foreach ($optionElement in $optionsElement.SelectNodes("Option")) {
+                $index = [int]$optionElement.GetAttribute("Index")
+                $checked = [System.Convert]::ToBoolean($optionElement.GetAttribute("Checked"))
+                
+                if ($index -ge 0 -and $index -lt $optionCheckboxes.Count) {
+                    $optionCheckboxes[$index].Checked = $checked
+                }
+            }
+        }
+        
+        # Set current config file
+        $script:CurrentConfigFile = $ConfigPath
+        
+        Write-Log "Configuration loaded from: $ConfigPath" "Green"
+        return $true
+    }
+    catch {
+        Write-Log "Error loading configuration: $_" "Red"
+        return $false
+    }
+}
 
 # Initialize the form with some sample data for visualization
 Write-Log "Application initialized and ready to run." "Cyan"
