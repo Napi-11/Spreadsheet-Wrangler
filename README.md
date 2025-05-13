@@ -43,10 +43,14 @@ A PowerShell GUI application for folder backups and spreadsheet combining operat
 
 ## Running the Application
 
-### Option 1: Right-click method
-Right-click on `SpreadsheetWrangler.ps1` and select "Run with PowerShell"
+### Option 1: No Console Window (Recommended)
+Double-click on `Launch-SpreadsheetWrangler.vbs` to run the application without showing a PowerShell console window.
 
-### Option 2: Command line (recommended for first run)
+### Option 2: Right-click method
+Right-click on `SpreadsheetWrangler.ps1` and select "Run with PowerShell"
+(Note: This will show a PowerShell console window alongside the application)
+
+### Option 3: Command line
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\SpreadsheetWrangler.ps1
 ```
