@@ -2,7 +2,8 @@
 
 A PowerShell GUI application for folder backups and spreadsheet combining operations.
 
-<img src="https://github.com/user-attachments/assets/c78e7d1f-e388-4f1a-841d-0bfc4900e2b8" width=75% height=75%>
+<img src="https://github.com/user-attachments/assets/d3791579-ae79-45d9-866e-95077f9baccc" width=75% height=75%>
+
 
 ## Features
 
