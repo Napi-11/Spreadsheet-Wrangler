@@ -24,6 +24,8 @@ A PowerShell GUI application for folder backups and spreadsheet combining operat
 - **Duplicate Qty=2**: Duplicate rows with '2' in the "Add to Quantity" column
 - **Normalize Qty to 1**: Change all values in "Add to Quantity" column to '1'
 - **Log to File**: Save terminal output to a log file for future reference
+- **BLANK**: Insert a row with "BLANK" text between data from different spreadsheets
+- **Reverse, Reverse**: Reverse the order of data rows in the final combined spreadsheet
 
 ### Configuration Management
 - Save/load application settings to/from XML files
