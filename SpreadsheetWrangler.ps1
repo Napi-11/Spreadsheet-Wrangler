@@ -167,7 +167,13 @@ function Combine-Spreadsheets {
         [bool]$DuplicateQuantityTwoRows = $false,
         
         [Parameter(Mandatory=$false)]
-        [bool]$NormalizeQuantities = $false
+        [bool]$NormalizeQuantities = $false,
+        
+        [Parameter(Mandatory=$false)]
+        [bool]$InsertBlankRows = $false,
+        
+        [Parameter(Mandatory=$false)]
+        [bool]$ReverseDataRows = $false
     )
     
     try {
@@ -282,6 +288,44 @@ function Combine-Spreadsheets {
                     $dataRange.Copy() | Out-Null
                     $combinedWorksheet.Range($combinedWorksheet.Cells($rowIndex, 1), $combinedWorksheet.Cells($rowIndex + $lastRow - $startRow, $lastColumn)).PasteSpecial(-4163) | Out-Null
                     $rowIndex += $lastRow - $startRow + 1
+                    
+                    # Insert BLANK row between spreadsheets if option is enabled and this is not the last file
+                    if ($InsertBlankRows -and ($file -ne $files[-1])) {
+                        Write-Log "  Inserting BLANK row after data from: $file" "White"
+                        
+                        # Determine which columns should have BLANK values
+                        if (-not $ExcludeHeaders) {
+                            # If headers are included, add BLANK only to columns that have headers
+                            for ($col = 1; $col -le $lastColumn; $col++) {
+                                $headerText = $combinedWorksheet.Cells(1, $col).Text
+                                if (-not [string]::IsNullOrWhiteSpace($headerText)) {
+                                    $combinedWorksheet.Cells($rowIndex, $col).Value = "BLANK"
+                                }
+                            }
+                        } else {
+                            # If no headers, we need to determine which columns actually have data
+                            # Look at the first few rows to determine which columns are used
+                            $usedColumns = @{}
+                            
+                            # Check the first 5 rows (or fewer if there aren't that many)
+                            $rowsToCheck = [Math]::Min(5, $rowIndex - 1)
+                            for ($row = 1; $row -le $rowsToCheck; $row++) {
+                                for ($col = 1; $col -le $lastColumn; $col++) {
+                                    $cellValue = $combinedWorksheet.Cells($row, $col).Text
+                                    if (-not [string]::IsNullOrWhiteSpace($cellValue)) {
+                                        $usedColumns[$col] = $true
+                                    }
+                                }
+                            }
+                            
+                            # Add BLANK only to columns that have data
+                            foreach ($col in $usedColumns.Keys) {
+                                $combinedWorksheet.Cells($rowIndex, $col).Value = "BLANK"
+                            }
+                        }
+                        
+                        $rowIndex += 1
+                    }
                 }
                 
                 # Close the source workbook without saving
@@ -364,12 +408,50 @@ function Combine-Spreadsheets {
                     Write-Log "  'Add to Quantity' column not found, skipping quantity processing" "Yellow"
                 }
                 
+                # Apply Reverse, Reverse option if enabled
+                if ($ReverseDataRows) {
+                    Write-Log "  Applying 'Reverse, Reverse' option..." "White"
+                    
+                    # Determine the range to reverse (exclude header row if headers are included)
+                    $startRow = if (-not $ExcludeHeaders) { 2 } else { 1 }
+                    $lastRow = $tempWorksheet.UsedRange.Rows.Count
+                    $lastColumn = $tempWorksheet.UsedRange.Columns.Count
+                    
+                    if ($lastRow > $startRow) {
+                        # Create a temporary array to hold the reversed data
+                        $dataArray = @()
+                        
+                        # Copy data to array (from bottom to top)
+                        for ($row = $lastRow; $row -ge $startRow; $row--) {
+                            $rowData = @()
+                            for ($col = 1; $col -le $lastColumn; $col++) {
+                                $rowData += $tempWorksheet.Cells($row, $col).Value
+                            }
+                            $dataArray += ,$rowData
+                        }
+                        
+                        # Write the reversed data back to the worksheet
+                        for ($i = 0; $i -lt $dataArray.Count; $i++) {
+                            $row = $startRow + $i
+                            for ($col = 1; $col -le $lastColumn; $col++) {
+                                if ($col -le $dataArray[$i].Count) {
+                                    $tempWorksheet.Cells($row, $col).Value = $dataArray[$i][$col-1]
+                                }
+                            }
+                        }
+                        
+                        Write-Log "  Data rows reversed successfully" "Green"
+                    } else {
+                        Write-Log "  Not enough data rows to reverse" "Yellow"
+                    }
+                }
+                
                 # Save the processed workbook
                 $tempWorkbook.SaveAs($combinedFilePath)
                 $tempWorkbook.Close($true)
                 [System.Runtime.Interopservices.Marshal]::ReleaseComObject($tempWorkbook) | Out-Null
             } else {
-                # Save the combined workbook normally if no special processing needed
+                # Save the combined workbook normally
                 $combinedFilePath = Join-Path -Path $DestinationPath -ChildPath "Combined_Spreadsheet_$groupNumber.xlsx"
                 $combinedWorkbook.SaveAs($combinedFilePath)
                 $combinedWorkbook.Close($true)
@@ -438,6 +520,8 @@ function Start-SpreadsheetCombiningProcess {
     $excludeHeaders = $optionCheckboxes[2].Checked
     $duplicateQuantityTwoRows = $optionCheckboxes[3].Checked
     $normalizeQuantities = $optionCheckboxes[4].Checked
+    $insertBlankRows = $optionCheckboxes[6].Checked  # BLANK option (Option 7)
+    $reverseDataRows = $optionCheckboxes[7].Checked  # Reverse, Reverse option (Option 8)
     
     # Start combining spreadsheets with selected options
     $success = Combine-Spreadsheets `
@@ -446,7 +530,9 @@ function Start-SpreadsheetCombiningProcess {
         -FileExtension $fileExtension `
         -ExcludeHeaders $excludeHeaders `
         -DuplicateQuantityTwoRows $duplicateQuantityTwoRows `
-        -NormalizeQuantities $normalizeQuantities
+        -NormalizeQuantities $normalizeQuantities `
+        -InsertBlankRows $insertBlankRows `
+        -ReverseDataRows $reverseDataRows
     
     if ($success) {
         Write-Log "Spreadsheet combining completed successfully." "Green"
@@ -1031,20 +1117,20 @@ $checkbox6.Margin = New-Object System.Windows.Forms.Padding(5)
 $toolTip.SetToolTip($checkbox6, "Save terminal output to a log file in the application directory")
 $optionsLayout.Controls.Add($checkbox6, 2, 1)
 
-# Option 7: Placeholder
+# Option 7: BLANK - Insert separator rows between spreadsheets
 $optionCheckboxes += $checkbox7 = New-Object System.Windows.Forms.CheckBox
-$checkbox7.Text = "Option 7"
+$checkbox7.Text = "BLANK"
 $checkbox7.Dock = "Fill"
 $checkbox7.Margin = New-Object System.Windows.Forms.Padding(5)
-$toolTip.SetToolTip($checkbox7, "Reserved for future functionality")
+$toolTip.SetToolTip($checkbox7, "Insert 'BLANK' rows between data from different spreadsheets")
 $optionsLayout.Controls.Add($checkbox7, 0, 2)
 
-# Option 8: Placeholder
+# Option 8: Reverse, Reverse - Reverse the order of data rows
 $optionCheckboxes += $checkbox8 = New-Object System.Windows.Forms.CheckBox
-$checkbox8.Text = "Option 8"
+$checkbox8.Text = "Reverse, Reverse"
 $checkbox8.Dock = "Fill"
 $checkbox8.Margin = New-Object System.Windows.Forms.Padding(5)
-$toolTip.SetToolTip($checkbox8, "Reserved for future functionality")
+$toolTip.SetToolTip($checkbox8, "Reverse the order of data rows in the final combined spreadsheet")
 $optionsLayout.Controls.Add($checkbox8, 1, 2)
 
 # Option 9: Placeholder
